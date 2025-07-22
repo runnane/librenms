@@ -1,9 +1,9 @@
 <?php
 
-/**
- * geist-pdu.inc.php
+/*
+ * MaintenanceAlertBehavior.php
  *
- * LibreNMS pre-cache discovery module for Geist PDU
+ * -Description-
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,12 +16,17 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
  *
+ * @package    LibreNMS
  * @link       https://www.librenms.org
- *
- * @copyright  2017 Neil Lathwood
- * @author     Neil Lathwood <gh+n@laf.io>
  */
-echo 'ctrl3ChIECTable ';
-$pre_cache['geist_pdu_iec'] = snmpwalk_cache_oid($device, 'ctrl3ChIECTable', [], 'GEIST-MIB-V3');
+
+namespace LibreNMS\Enum;
+
+enum MaintenanceBehavior: int
+{
+    case SKIP_ALERTS = 1;
+    case MUTE_ALERTS = 2;
+    case RUN_ALERTS = 3;
+}

@@ -22,6 +22,7 @@ return [
             'general' => ['name' => 'General Alert Settings'],
             'email' => ['name' => 'Email Options'],
             'rules' => ['name' => 'Alert Rule Default Settings'],
+            'scheduled-maintenance' => ['name' => 'Scheduled Maintenance'],
         ],
         'api' => [
             'cors' => ['name' => 'CORS'],
@@ -101,6 +102,7 @@ return [
             'general' => ['name' => 'General Web UI Settings'],
             'front-page' => ['name' => 'Front Page Settings'],
             'menu' => ['name' => 'Menu Settings'],
+            'scheduled-maintenance' => ['name' => 'Scheduled Maintenance'],
         ],
     ],
     'settings' => [
@@ -196,6 +198,15 @@ return [
             'globals' => [
                 'description' => 'Issue alerts to read only users (deprecated)',
                 'help' => 'Deprecated, use the mail alert transport instead.',
+            ],
+            'scheduled_maintenance_default_behavior' => [
+                'description' => 'Default behavior for scheduled maintenance',
+                'help' => 'Default behavior for scheduled maintenance',
+                'options' => [
+                    '1' => 'Skip alerts',
+                    '2' => 'Mute alerts',
+                    '3' => 'Run alerts',
+                ],
             ],
             'syscontact' => [
                 'description' => 'Issue alerts to sysContact (deprecated)',
@@ -769,7 +780,7 @@ return [
                 'description' => 'UCD DiskIO',
             ],
             'vlans' => [
-                'description' => 'VLans',
+                'description' => 'VLANs',
             ],
             'vminfo' => [
                 'description' => 'Hypervisor VM Info',
@@ -1645,6 +1656,9 @@ return [
             'bgp-peers' => [
                 'description' => 'BGP Peers',
             ],
+            'vlans' => [
+                'description' => 'VLANs',
+            ],
             'junose-atm-vp' => [
                 'description' => 'JunOS ATM VP',
             ],
@@ -2229,6 +2243,10 @@ return [
             'help' => 'Enables the mouseover graphs in the web interface',
         ],
         'webui' => [
+            'scheduled_maintenance_default_behavior' => [
+                'description' => 'Default Behaviour',
+                'help' => 'When managing scheduled maintenances, this will be the default option for the Behavior option.',
+            ],
             'availability_map_box_size' => [
                 'description' => 'Availability box width',
                 'help' => 'Input desired tile width in pixels for box size in full view',
