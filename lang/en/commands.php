@@ -115,7 +115,13 @@ return [
     'device:ping' => [
         'description' => 'Ping device and record data for response',
         'arguments' => [
-            'device spec' => 'Device to ping one of: <Device ID>, <Hostname/IP>, all',
+            'device spec' => 'Device to ping one of: <Device ID>, <Hostname/IP>, all, fast ("fast" will ping all devices and update graphs and status)',
+        ],
+        'options' => [
+            'groups' => 'Group ID(s) to ping. Specify multiple times for multiple groups. (only valid with fast)',
+        ],
+        'errors' => [
+            'groups_without_fast' => 'The --groups (-g) option is only supported with "fast" device spec.',
         ],
     ],
     'device:poll' => [
@@ -195,6 +201,9 @@ return [
         'success' => 'Successfully updated OUI/Vendor mappings. :count modified OUI|Successfully updated. :count modified OUIs',
         'error' => 'Error processing Mac OUI:',
         'vendor_update' => 'Adding OUI :oui for :vendor',
+    ],
+    'maintenance:cleanup-syslog' => [
+        'delete' => 'Cleared syslog entries older than :days days (:count rows)',
     ],
     'plugin:disable' => [
         'description' => 'Disable all plugins with the given name',
@@ -294,7 +303,14 @@ return [
             'full-name' => 'Full name for the user',
             'role' => 'Set the user to the desired role :roles',
         ],
-        'password-request' => "Please enter the user's password",
+        'form' => [
+            'username' => 'Username',
+            'password' => 'Password',
+            'roles' => 'Select user role(s)',
+            'email' => 'Email (optional)',
+            'full-name' => 'Full name (optional)',
+            'descr' => 'Description (optional)',
+        ],
         'success' => 'Successfully added user: :username',
         'wrong-auth' => 'Warning! You will not be able to log in with this user because you are not using MySQL auth',
     ],

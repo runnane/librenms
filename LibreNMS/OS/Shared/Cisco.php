@@ -63,6 +63,7 @@ use LibreNMS\OS\Traits\YamlOSDiscovery;
 use LibreNMS\RRD\RrdDefinition;
 use LibreNMS\Util\IP;
 use LibreNMS\Util\Mac;
+use LibreNMS\Util\StringHelpers;
 use SnmpQuery;
 
 class Cisco extends OS implements
@@ -868,7 +869,7 @@ class Cisco extends OS implements
 
     public function setQosParents($qos)
     {
-        $qos->each(function (Qos $thisQos, int $key) use ($qos) {
+        $qos->each(function (Qos $thisQos, int $key) use ($qos): void {
             $parent_idx = $this->qosIdxToParent->get($thisQos->snmp_idx);
 
             if ($parent_idx) {
@@ -929,24 +930,24 @@ class Cisco extends OS implements
                 // Cisco CBQoS is one directional
                 if ($thisQos->ingress) {
                     $thisQos->last_polled = $poll_time;
-                    $thisQos->last_bytes_in = $preBytes ? $preBytes[$snmp_parts[0]][$snmp_parts[1]]['cbQosCMPrePolicyByte64'] : null;
+                    $thisQos->last_bytes_in = $preBytes ? (int) $preBytes[$snmp_parts[0]][$snmp_parts[1]]['cbQosCMPrePolicyByte64'] : null;
                     $thisQos->last_bytes_out = null;
-                    $thisQos->last_bytes_drop_in = $dropBytes ? $dropBytes[$snmp_parts[0]][$snmp_parts[1]]['cbQosCMDropByte64'] : null;
+                    $thisQos->last_bytes_drop_in = $dropBytes ? (int) $dropBytes[$snmp_parts[0]][$snmp_parts[1]]['cbQosCMDropByte64'] : null;
                     $thisQos->last_bytes_drop_out = null;
-                    $thisQos->last_packets_in = $prePackets ? $prePackets[$snmp_parts[0]][$snmp_parts[1]]['cbQosCMPrePolicyPkt64'] : null;
+                    $thisQos->last_packets_in = $prePackets ? (int) $prePackets[$snmp_parts[0]][$snmp_parts[1]]['cbQosCMPrePolicyPkt64'] : null;
                     $thisQos->last_packets_out = null;
-                    $thisQos->last_packets_drop_in = $dropPackets ? $dropPackets[$snmp_parts[0]][$snmp_parts[1]]['cbQosCMDropPkt64'] : null;
+                    $thisQos->last_packets_drop_in = $dropPackets ? (int) $dropPackets[$snmp_parts[0]][$snmp_parts[1]]['cbQosCMDropPkt64'] : null;
                     $thisQos->last_packets_drop_out = null;
                 } elseif ($thisQos->egress) {
                     $thisQos->last_polled = $poll_time;
                     $thisQos->last_bytes_in = null;
-                    $thisQos->last_bytes_out = $preBytes ? $preBytes[$snmp_parts[0]][$snmp_parts[1]]['cbQosCMPrePolicyByte64'] : null;
+                    $thisQos->last_bytes_out = $preBytes ? (int) $preBytes[$snmp_parts[0]][$snmp_parts[1]]['cbQosCMPrePolicyByte64'] : null;
                     $thisQos->last_bytes_drop_in = null;
-                    $thisQos->last_bytes_drop_out = $dropBytes ? $dropBytes[$snmp_parts[0]][$snmp_parts[1]]['cbQosCMDropByte64'] : null;
+                    $thisQos->last_bytes_drop_out = $dropBytes ? (int) $dropBytes[$snmp_parts[0]][$snmp_parts[1]]['cbQosCMDropByte64'] : null;
                     $thisQos->last_packets_in = null;
-                    $thisQos->last_packets_out = $prePackets ? $prePackets[$snmp_parts[0]][$snmp_parts[1]]['cbQosCMPrePolicyPkt64'] : null;
+                    $thisQos->last_packets_out = $prePackets ? (int) $prePackets[$snmp_parts[0]][$snmp_parts[1]]['cbQosCMPrePolicyPkt64'] : null;
                     $thisQos->last_packets_drop_in = null;
-                    $thisQos->last_packets_drop_out = $dropPackets ? $dropPackets[$snmp_parts[0]][$snmp_parts[1]]['cbQosCMDropPkt64'] : null;
+                    $thisQos->last_packets_drop_out = $dropPackets ? (int) $dropPackets[$snmp_parts[0]][$snmp_parts[1]]['cbQosCMDropPkt64'] : null;
                 } else {
                     d_echo('Cisco CBQoS ' . $thisQos->title . ' not processed because it it not marked as ingress or egress');
                 }
@@ -996,17 +997,48 @@ class Cisco extends OS implements
             return $ports;
         }
 
-        // Only returns 'untagged' vlan for each port (either access ports, or native vlan of a trunk)
-        // stored for use in below loop
         $native_vlans_raw = SnmpQuery::abortOnFailure()->walk([
-            'CISCO-VTP-MIB::vlanTrunkPortNativeVlan',
+            'CISCO-VTP-MIB::vlanTrunkPortTable',
             'CISCO-VLAN-MEMBERSHIP-MIB::vmVlan',
         ])->table(1);
 
         // Hash Table indexed by vlans and ifIndexes
         foreach ($native_vlans_raw as $ifindex => $data) {
+            // Only returns 'untagged' vlan for each port (either access ports, or native vlan of a trunk)
+            // stored for use in below loop
             $vlan_id = $data['CISCO-VLAN-MEMBERSHIP-MIB::vmVlan'] ?? $data['CISCO-VTP-MIB::vlanTrunkPortNativeVlan'] ?? 0;
-            $isNative[$vlan_id][$ifindex] = 1;
+            if ($vlan_id > 0) {
+                $isNative[$vlan_id][$ifindex] = 1;
+            }
+            if (isset($data['CISCO-VTP-MIB::vlanTrunkPortDynamicState']) && $data['CISCO-VTP-MIB::vlanTrunkPortDynamicState'] == 2) {
+                continue; // This port is not a trunk, so continue to next one
+            }
+            // Only returns 'tagged' vlan for each port
+            // stored for use in below loop
+            if (isset($data['CISCO-VTP-MIB::vlanTrunkPortVlansXmitJoined'])) {
+                $vlanIds = StringHelpers::bitsToIndices($data['CISCO-VTP-MIB::vlanTrunkPortVlansXmitJoined']);
+                foreach ($vlanIds as $vlan_id) {
+                    $isNative[$vlan_id - 1][$ifindex] ??= 0;
+                }
+            }
+            if (isset($data['CISCO-VTP-MIB::vlanTrunkPortVlansXmitJoined2k'])) {
+                $vlanIds = StringHelpers::bitsToIndices($data['CISCO-VTP-MIB::vlanTrunkPortVlansXmitJoined2k']);
+                foreach ($vlanIds as $vlan_id) {
+                    $isNative[$vlan_id + 1023][$ifindex] ??= 0;
+                }
+            }
+            if (isset($data['CISCO-VTP-MIB::vlanTrunkPortVlansXmitJoined3k'])) {
+                $vlanIds = StringHelpers::bitsToIndices($data['CISCO-VTP-MIB::vlanTrunkPortVlansXmitJoined3k']);
+                foreach ($vlanIds as $vlan_id) {
+                    $isNative[$vlan_id + 2047][$ifindex] ??= 0;
+                }
+            }
+            if (isset($data['CISCO-VTP-MIB::vlanTrunkPortVlansXmitJoined4k'])) {
+                $vlanIds = StringHelpers::bitsToIndices($data['CISCO-VTP-MIB::vlanTrunkPortVlansXmitJoined4k']);
+                foreach ($vlanIds as $vlan_id) {
+                    $isNative[$vlan_id + 3071][$ifindex] ??= 0;
+                }
+            }
         }
 
         // process all the discovered vlans
@@ -1035,13 +1067,13 @@ class Cisco extends OS implements
                         'priority' => $data['BRIDGE-MIB::dot1dStpPortPriority'] ?? 0,
                         'state' => $data['BRIDGE-MIB::dot1dStpPortState'] ?? 'unknown',
                         'cost' => $data['BRIDGE-MIB::dot1dStpPortPathCost'] ?? 0,
-                        'untagged' => isset($isNative[$vlan_id][$ifindex]),
+                        'untagged' => isset($isNative[$vlan_id][$ifindex]) && $isNative[$vlan_id][$ifindex] > 0,
                         'port_id' => PortCache::getIdFromIfIndex($ifindex, $this->getDeviceId()) ?? 0, // ifIndex from device
                     ]));
                 }
             }
 
-            // Let's do the native/access that were not processed above
+            // Let's do the ones that were not processed above
             // if we have isNative for this vlan, then we check which ifindexes are not yet processed and we add them.
             if (isset($isNative[$vlan_id])) {
                 foreach ($isNative[$vlan_id] as $ifindex => $value) {
@@ -1051,7 +1083,7 @@ class Cisco extends OS implements
                     $ports->push(new PortVlan([
                         'vlan' => $vlan_id,
                         'baseport' => $this->bridgePortFromIfIndex($ifindex),
-                        'untagged' => 1,
+                        'untagged' => $value,
                         'state' => 'unknown',
                         'port_id' => PortCache::getIdFromIfIndex($ifindex, $this->getDeviceId()) ?? 0, // ifIndex from device,
                     ]));
